@@ -34,6 +34,7 @@ set(dray_headers dray.hpp
                  transform_3d.hpp
                  triangle_mesh.hpp
                  triangle_intersection.hpp
+                 uniform_topology.hpp
                  vec.hpp
                  io/obj_reader.hpp
                  io/mfem_reader.hpp
@@ -102,6 +103,7 @@ set(dray_sources dray.cpp
                  ray.cpp
                  triangle_mesh.cpp
                  vec.cpp
+                 uniform_topology.cpp
                  test.cpp
                  utils/color_buffer_utils.cpp
                  utils/data_logger.cpp
