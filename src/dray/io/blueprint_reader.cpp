@@ -25,6 +25,21 @@ namespace dray
 namespace detail
 {
 
+bool is_high_order(const conduit::Node &dom)
+{
+  if(dom.has_path("fields"))
+  {
+    const conduit::Node &fields = dom["fields"];
+    const int num_fields= fields.number_of_children();
+    for(int t = 0; t < num_fields; ++t)
+    {
+      const conduit::Node &field = fields.child(t);
+      if(field.has_path("basis")) return true;
+    }
+ }
+  return false;
+}
+
 std::string append_cycle (const std::string &base, const int cycle)
 {
   std::ostringstream oss;
@@ -226,6 +241,16 @@ void relay_blueprint_mesh_read (const Node &options, Node &data)
 template <typename T>
 DataSet bp2dray (const conduit::Node &n_dataset)
 {
+  bool high_order = is_high_order(n_dataset);
+  if(high_order)
+  {
+    std::cout<<"HO\n";
+  }
+  else
+  {
+    std::cout<<"LO\n";
+  }
+
   using MeshElemT = MeshElem<3u, Quad, General>;
   using FieldElemT = FieldOn<MeshElemT, 1u>;
 
