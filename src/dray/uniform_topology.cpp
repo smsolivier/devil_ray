@@ -52,9 +52,9 @@ UniformTopology::bounds() const
   AABB<3> bounds;
   bounds.include(m_origin);
   Vec<Float,3> upper;
-  upper[0] = m_spacing[0] * Float(m_dims[0]);
-  upper[1] = m_spacing[1] * Float(m_dims[1]);
-  upper[2] = m_spacing[2] * Float(m_dims[2]);
+  upper[0] = m_origin[0] + m_spacing[0] * Float(m_dims[0]);
+  upper[1] = m_origin[1] + m_spacing[1] * Float(m_dims[1]);
+  upper[2] = m_origin[2] + m_spacing[2] * Float(m_dims[2]);
   bounds.include(upper);
   return bounds;
 }

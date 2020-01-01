@@ -7,6 +7,7 @@
 #include <dray/io/blueprint_reader.hpp>
 #include <dray/mfem2dray.hpp>
 #include <dray/derived_topology.hpp>
+#include <dray/uniform_topology.hpp>
 #include <dray/GridFunction/field.hpp>
 #include <dray/utils/data_logger.hpp>
 
@@ -236,6 +237,95 @@ void relay_blueprint_mesh_read (const Node &options, Node &data)
   relay::io::load (domain_file, data_protocol, data);
 }
 
+
+DataSet low_order(const conduit::Node &n_dataset)
+{
+  const int num_topos = n_dataset["topologies"].number_of_children();
+  if(num_topos != 1)
+  {
+    DRAY_ERROR("Only a single topology is supported");
+  }
+  const conduit::Node &topo = n_dataset["topologies"].child(0);
+
+  if(topo["type"].as_string() != "uniform")
+  {
+    DRAY_ERROR("Only uniform topology implemented");
+  }
+  const std::string cname = topo["coordset"].as_string();
+  const conduit::Node coords = n_dataset["coordsets/"+cname];
+
+  const Node &n_dims = coords["dims"];
+
+  int dims_i = n_dims["i"].to_int();
+  int dims_j = n_dims["j"].to_int();
+  int dims_k = 1;
+  bool is_2d = true;
+
+  // check for 3d
+  if(n_dims.has_path("k"))
+  {
+    dims_k = n_dims["k"].to_int();
+    is_2d = false;
+  }
+
+  Float origin_x = 0.0f;
+  Float origin_y = 0.0f;
+  Float origin_z = 0.0f;
+
+  if(coords.has_path("origin"))
+  {
+    const Node &n_origin = coords["origin"];
+
+    if(n_origin.has_child("x"))
+    {
+      origin_x = n_origin["x"].to_float32();
+    }
+
+    if(n_origin.has_child("y"))
+    {
+      origin_y = n_origin["y"].to_float32();
+    }
+
+    if(n_origin.has_child("z"))
+    {
+      origin_z = n_origin["z"].to_float32();
+    }
+  }
+
+  Float spacing_x = 1.0f;
+  Float spacing_y = 1.0f;
+  Float spacing_z = 1.0f;
+
+  if(coords.has_path("spacing"))
+  {
+    const Node &n_spacing = coords["spacing"];
+
+    if(n_spacing.has_path("dx"))
+    {
+        spacing_x = n_spacing["dx"].to_float32();
+    }
+
+    if(n_spacing.has_path("dy"))
+    {
+        spacing_y = n_spacing["dy"].to_float32();
+    }
+
+    if(n_spacing.has_path("dz"))
+    {
+        spacing_z = n_spacing["dz"].to_float32();
+    }
+  }
+
+  Vec<Float,3> spacing{spacing_x, spacing_y, spacing_z};
+  Vec<Float,3> origin{origin_x, origin_y, origin_z};
+  Vec<int32,3> dims{dims_i, dims_j, dims_k};
+
+  std::shared_ptr<UniformTopology> utopo
+    = std::make_shared<UniformTopology>(spacing, origin, dims);
+
+  DataSet dataset(utopo);
+  return dataset;
+}
 //-----------------------------------------------------------------------------
 
 template <typename T>
@@ -248,8 +338,9 @@ DataSet bp2dray (const conduit::Node &n_dataset)
   }
   else
   {
-    std::cout<<"LO\n";
+    return low_order(n_dataset);
   }
+
 
   using MeshElemT = MeshElem<3u, Quad, General>;
   using FieldElemT = FieldOn<MeshElemT, 1u>;
