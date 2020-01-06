@@ -9,8 +9,9 @@
 #include <dray/io/blueprint_reader.hpp>
 #include <dray/filters/path_lengths.hpp>
 #include <conduit_blueprint.hpp>
+#include <conduit_relay.hpp>
 
-#define EXAMPLE_MESH_SIDE_DIM 2
+#define EXAMPLE_MESH_SIDE_DIM 10
 
 TEST (dray_slice, dray_slice)
 {
@@ -27,8 +28,12 @@ TEST (dray_slice, dray_slice)
                                             data);
   //data.print();
   dray::DataSet dataset = dray::BlueprintReader::blueprint_to_dray(data);
+  conduit::relay::io::save(data,"uniform", "hdf5");
 
   dray::PathLengths pl;
+  pl.resolution(100,100);
+  pl.absorption_field("radial");
+  pl.emission_field("radial");
   pl.execute(dataset);
 
 }

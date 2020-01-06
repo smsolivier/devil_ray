@@ -1,7 +1,10 @@
 #include <dray/filters/path_lengths.hpp>
 #include <dray/uniform_topology.hpp>
+#include <dray/error.hpp>
 #include <dray/policies.hpp>
 #include <dray/utils/point_writer.hpp>
+#include <dray/utils/png_encoder.hpp>
+#include <dray/GridFunction/low_order_field.hpp>
 
 namespace dray
 {
@@ -107,6 +110,12 @@ struct DDATraversal
     return inside;
   }
 
+  DRAY_EXEC
+  int32 voxel_index(const Vec<int32, 3> &voxel) const
+  {
+    return voxel[0] + voxel[1] * m_dims[0] + voxel[2] * m_dims[0] * m_dims[1];
+  }
+
   DRAY_EXEC Float
   init_traversal(const Vec<Float,3> &point,
                  const Vec<Float,3> &dir,
@@ -183,8 +192,8 @@ struct DDATraversal
 } // namespace detail
 
 PathLengths::PathLengths()
- :  m_x_res(10),
-    m_y_res(10),
+ :  m_x_res(512),
+    m_y_res(512),
     m_width(2.f),
     m_height(2.f),
     m_origin({{0.f, 0.f, 15.f}}),
@@ -232,38 +241,94 @@ PathLengths::generate_pixels()
   return pixels;
 }
 
-void go(Array<Vec<Float,3>> &pixels, UniformTopology &topo)
+Array<Float>
+go(Array<Vec<Float,3>> &pixels,
+   Array<Vec<Float,3>> &samples,
+   UniformTopology &topo,
+   LowOrderField *absorption,
+   LowOrderField *emission)
 {
+  // input
   const detail::DDATraversal dda(topo);
   const Vec<Float,3> *pixel_ptr = pixels.get_device_ptr_const();
+  const Vec<Float,3> *sample_ptr = samples.get_device_ptr_const();
+  const int32 size_samples = samples.size();
   const int32 size = pixels.size();
+  const Float *absorption_ptr = absorption->values().get_device_ptr_const();
+  const Float *emission_ptr = emission->values().get_device_ptr_const();
+
+  // output
+  Array<Float> path_lengths;
+  path_lengths.resize(size);
+  Float *length_ptr = path_lengths.get_device_ptr();
 
   RAJA::forall<for_policy>(RAJA::RangeSegment(0, size), [=] DRAY_LAMBDA (int32 index)
   {
     Vec<Float,3> pixel = pixel_ptr[index];
-    Vec<Float,3> loc = {{1.5f, 0.5f, 0.5f}}; // dummy point
-    Vec<Float,3> dir = pixel - loc;
-    dir.normalize();
-    detail::TraversalState state;
-    dda.init_traversal(loc, dir, state);
-
-    Float distance = 0.f;
-
-    while(dda.is_inside(state.m_voxel))
+    Float sum = 0;
+    for(int sample = 0; sample < size_samples; ++sample)
     {
-      const Float voxel_exit = state.exit();
-      const Float length = voxel_exit - distance;
-      if(index == 1) std::cout<<state.m_voxel<<" length "<<length<<"\n";
-      // do stuff
-      distance = voxel_exit;
-      state.advance();
-    }
+      Vec<Float,3> loc = sample_ptr[sample];
+      Vec<Float,3> dir = pixel - loc;
+      dir.normalize();
+      detail::TraversalState state;
+      dda.init_traversal(loc, dir, state);
 
+      Float distance = 0.f;
+      Float res = 0.f;
+
+      while(dda.is_inside(state.m_voxel))
+      {
+        const Float voxel_exit = state.exit();
+        const Float length = voxel_exit - distance;
+
+        const int32 cell_id = dda.voxel_index(state.m_voxel);
+        const Float absorb = exp(-absorption_ptr[cell_id] * length);
+        const Float emis = emission_ptr[cell_id];
+        res = res * absorb + emis * (1.f - absorb);
+        // this will get more complicated with MPI and messed up
+        // metis domain decompositions
+
+        if(index == 40)
+        {
+          std::cout<<state.m_voxel<<" length "<<length<<" res "<<res<<" abs "<<absorb<<" emis "<<emis<<"\n";
+          std::cout<<absorption_ptr[cell_id]<<" "<<emission_ptr[cell_id]<<"\n";
+        }
+
+        distance = voxel_exit;
+        state.advance();
+      }
+      sum += res;
+
+    }
+    length_ptr[index] = sum;
   });
+
+  return path_lengths;
 }
 
 void PathLengths::execute(DataSet &data_set)
 {
+  if(m_absorption_field == "")
+  {
+    DRAY_ERROR("Absorption field not set");
+  }
+
+  if(m_emission_field == "")
+  {
+    DRAY_ERROR("Emission field not set");
+  }
+
+  if(!data_set.has_field(m_absorption_field))
+  {
+    DRAY_ERROR("No absorption field '"<<m_absorption_field<<"' found");
+  }
+
+  if(!data_set.has_field(m_emission_field))
+  {
+    DRAY_ERROR("No emission field '"<<m_emission_field<<"' found");
+  }
+
   Array<Vec<Float,3>> pixels = generate_pixels();
   write_points(pixels);
 
@@ -271,10 +336,91 @@ void PathLengths::execute(DataSet &data_set)
   if(dynamic_cast<UniformTopology*>(topo) != nullptr)
   {
     std::cout<<"Boom\n";
-    UniformTopology *uni_topo = dynamic_cast<UniformTopology*>(topo);
-    go(pixels, *uni_topo);
 
+    UniformTopology *uni_topo = dynamic_cast<UniformTopology*>(topo);
+    LowOrderField *absorption = dynamic_cast<LowOrderField*>(data_set.field(m_absorption_field));
+    LowOrderField *emission = dynamic_cast<LowOrderField*>(data_set.field(m_emission_field));
+
+    std::cout<<"emision "<<emission<<"\n";
+
+    if(absorption->assoc() != LowOrderField::Assoc::Element)
+    {
+      DRAY_ERROR("Absorption field must be associated with elements");
+    }
+
+    if(emission->assoc() != LowOrderField::Assoc::Element)
+    {
+      DRAY_ERROR("Emission field must be associated with elements");
+    }
+    Array<Vec<Float,3>> samples = detail::cell_centers(*uni_topo);
+    Array<Float> plengths = go(pixels, samples, *uni_topo, absorption, emission);
+    write_image(plengths);
   }
+}
+
+void PathLengths::write_image(Array<Float> values)
+{
+  const Float *values_ptr = values.get_device_ptr_const();
+  const int32 size = values.size();
+
+  RAJA::ReduceMin<reduce_policy, Float> xmin (infinity<Float>());
+  RAJA::ReduceMax<reduce_policy, Float> xmax (neg_infinity<Float>());
+
+  RAJA::forall<for_policy> (RAJA::RangeSegment (0, size), [=] DRAY_LAMBDA (int32 ii)
+  {
+    const Float value = values_ptr[ii];
+    xmin.min (value);
+    xmax.max (value);
+  });
+
+  float32 minv = xmin.get ();
+  float32 maxv = xmax.get ();
+  const float32 len = maxv - minv;
+  const int32 image_size = m_x_res * m_y_res;
+
+  Array<float32> dbuffer;
+  dbuffer.resize (image_size * 4);
+
+  float32 *d_ptr = dbuffer.get_host_ptr ();
+
+  RAJA::forall<for_policy> (RAJA::RangeSegment (0, image_size), [=] DRAY_LAMBDA (int32 i)
+  {
+    const float32 depth = values_ptr[i];
+    float32 value = 0.f;
+
+    if (depth != infinity32 ())
+    {
+      value = (depth - minv) / len;
+    }
+    //std::cout<<value<<" ";
+    const int32 offset = i * 4;
+    d_ptr[offset + 0] = value;
+    d_ptr[offset + 1] = value;
+    d_ptr[offset + 2] = value;
+    d_ptr[offset + 3] = 1.f;
+  });
+
+  PNGEncoder png_encoder;
+
+  png_encoder.encode (d_ptr, m_x_res, m_y_res);
+
+  png_encoder.save ("path_lengths.png");
+}
+
+void PathLengths::absorption_field(const std::string field_name)
+{
+  m_absorption_field = field_name;
+}
+
+void PathLengths::emission_field(const std::string field_name)
+{
+  m_emission_field = field_name;
+}
+
+void PathLengths::resolution(const int32 x, const int32 y)
+{
+  m_x_res = x;
+  m_y_res = y;
 }
 
 };//namespace dray

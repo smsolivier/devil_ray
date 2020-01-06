@@ -34,6 +34,12 @@ LowOrderField::~LowOrderField()
 
 }
 
+Array<Float>
+LowOrderField::values()
+{
+  return m_values;
+}
+
 LowOrderField::Assoc
 LowOrderField::assoc() const
 {
