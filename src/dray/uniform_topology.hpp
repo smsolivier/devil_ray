@@ -31,6 +31,10 @@ public:
 
   virtual int32 dims() const override;
 
+  Vec<int32,3> cell_dims() const;
+  Vec<Float,3> spacing() const;
+  Vec<Float,3> origin() const;
+
   virtual std::string type_name() const override;
 
   virtual AABB<3> bounds() const override;

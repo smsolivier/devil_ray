@@ -7,6 +7,7 @@
 #include "test_config.h"
 #include "gtest/gtest.h"
 #include <dray/io/blueprint_reader.hpp>
+#include <dray/filters/path_lengths.hpp>
 #include <conduit_blueprint.hpp>
 
 #define EXAMPLE_MESH_SIDE_DIM 2
@@ -24,7 +25,10 @@ TEST (dray_slice, dray_slice)
                                             EXAMPLE_MESH_SIDE_DIM,
                                             EXAMPLE_MESH_SIDE_DIM,
                                             data);
-  data.print();
+  //data.print();
   dray::DataSet dataset = dray::BlueprintReader::blueprint_to_dray(data);
+
+  dray::PathLengths pl;
+  pl.execute(dataset);
 
 }

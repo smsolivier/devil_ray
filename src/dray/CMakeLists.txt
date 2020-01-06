@@ -57,6 +57,7 @@ set(dray_headers dray.hpp
                  utils/png_encoder.hpp
                  utils/png_decoder.hpp
                  utils/png_compare.hpp
+                 utils/point_writer.hpp
                  utils/ray_utils.hpp
                  utils/timer.hpp
                  utils/yaml_writer.hpp
@@ -80,8 +81,10 @@ set(dray_headers dray.hpp
                  GridFunction/mesh_utils.hpp
                  GridFunction/field.hpp
                  GridFunction/grid_function.hpp
+                 GridFunction/low_order_field.hpp
 
                  filters/mesh_boundary.hpp
+                 filters/path_lengths.hpp
 
                  #filters/attractor_map.hpp
                  filters/surface_triangle.hpp
@@ -110,6 +113,7 @@ set(dray_sources dray.cpp
                  utils/png_encoder.cpp
                  utils/png_decoder.cpp
                  utils/png_compare.cpp
+                 utils/point_writer.cpp
                  utils/ray_utils.cpp
                  ambient_occlusion.cpp
                  intersection_context.cpp
@@ -133,11 +137,13 @@ set(dray_sources dray.cpp
                  Element/pos_tensor_element.cpp
                  Element/pos_simplex_element.cpp
                  GridFunction/grid_function.cpp
+                 GridFunction/low_order_field.cpp
                  GridFunction/mesh.cpp
                  GridFunction/mesh_utils.cpp
                  GridFunction/field.cpp
 
                  filters/mesh_boundary.cpp
+                 filters/path_lengths.cpp
 
                  #filters/attractor_map.cpp
                  filters/surface_triangle.cpp

@@ -65,4 +65,22 @@ UniformTopology::locate(Array<Vec<Float, 3>> &wpoints) const
   DRAY_ERROR("not implemented");
 }
 
+Vec<int32,3>
+UniformTopology::cell_dims() const
+{
+  return m_dims;
+}
+
+Vec<Float,3>
+UniformTopology::spacing() const
+{
+  return m_spacing;
+}
+
+Vec<Float,3>
+UniformTopology::origin() const
+{
+  return m_origin;
+}
+
 } // namespace dray

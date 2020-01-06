@@ -7,8 +7,6 @@
 #include <dray/utils/data_logger.hpp>
 
 #include <dray/policies.hpp>
-#include <RAJA/RAJA.hpp>
-
 
 namespace dray
 {
