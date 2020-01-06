@@ -301,10 +301,12 @@ void uniform_low_order_fields(const conduit::Node &n_dataset, DataSet &dataset)
         if(assoc_str == "vertex")
         {
           assoc = LowOrderField::Assoc::Vertex;
+          std::cout<<"V size "<<values.size()<<"\n";
         }
         else
         {
           assoc = LowOrderField::Assoc::Element;
+          std::cout<<"E size "<<values.size()<<"\n";
         }
 
         std::shared_ptr<LowOrderField> field
@@ -339,15 +341,16 @@ DataSet low_order(const conduit::Node &n_dataset)
 
   const Node &n_dims = coords["dims"];
 
-  int dims_i = n_dims["i"].to_int();
-  int dims_j = n_dims["j"].to_int();
+  // cell dims
+  int dims_i = n_dims["i"].to_int() - 1;
+  int dims_j = n_dims["j"].to_int() - 1;
   int dims_k = 1;
   bool is_2d = true;
 
   // check for 3d
   if(n_dims.has_path("k"))
   {
-    dims_k = n_dims["k"].to_int();
+    dims_k = n_dims["k"].to_int() - 1;
     is_2d = false;
   }
 

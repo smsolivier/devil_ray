@@ -205,8 +205,8 @@ PathLengths::PathLengths()
 Array<Vec<Float,3>>
 PathLengths::generate_pixels()
 {
-  const Float pixel_width = Float(m_x_res) / m_width;
-  const Float pixel_height = Float(m_y_res) / m_height;
+  const Float pixel_width =  m_width / Float(m_x_res);
+  const Float pixel_height = m_height / Float(m_y_res);
 
   // better be orthogonal
   assert(dot(m_normal, m_x_dir) == 0.f);
@@ -256,17 +256,24 @@ go(Array<Vec<Float,3>> &pixels,
   const int32 size = pixels.size();
   const Float *absorption_ptr = absorption->values().get_device_ptr_const();
   const Float *emission_ptr = emission->values().get_device_ptr_const();
+  std::cout<<"Size abs "<<absorption->values().size();
 
   // output
   Array<Float> path_lengths;
   path_lengths.resize(size);
   Float *length_ptr = path_lengths.get_device_ptr();
 
+  Array<Vec<Float,3>> path;
+  path.resize(20);
+  Vec<Float,3> *path_ptr = path.get_device_ptr();
+
   RAJA::forall<for_policy>(RAJA::RangeSegment(0, size), [=] DRAY_LAMBDA (int32 index)
   {
     Vec<Float,3> pixel = pixel_ptr[index];
     Float sum = 0;
-    for(int sample = 0; sample < size_samples; ++sample)
+    //for(int sample = 0; sample < size_samples; ++sample)
+    int32 path_count;
+    for(int sample = 0; sample < 1; ++sample)
     {
       Vec<Float,3> loc = sample_ptr[sample];
       Vec<Float,3> dir = pixel - loc;
@@ -289,21 +296,31 @@ go(Array<Vec<Float,3>> &pixels,
         // this will get more complicated with MPI and messed up
         // metis domain decompositions
 
+        distance = voxel_exit;
+        state.advance();
         if(index == 40)
         {
           std::cout<<state.m_voxel<<" length "<<length<<" res "<<res<<" abs "<<absorb<<" emis "<<emis<<"\n";
           std::cout<<absorption_ptr[cell_id]<<" "<<emission_ptr[cell_id]<<"\n";
+          path_ptr[path_count] = loc + dir * distance;
+          path_count++;
         }
 
-        distance = voxel_exit;
-        state.advance();
       }
       sum += res;
+
+      if(index == 40)
+      {
+        for(int p = path_count; p < 20; ++p)
+        {
+          path_ptr[path_count] = {{0.f, 0.f,0.f}};
+        }
+      }
 
     }
     length_ptr[index] = sum;
   });
-
+  write_points(path, "path");
   return path_lengths;
 }
 

@@ -28,7 +28,7 @@ TEST (dray_slice, dray_slice)
                                             data);
   //data.print();
   dray::DataSet dataset = dray::BlueprintReader::blueprint_to_dray(data);
-  conduit::relay::io::save(data,"uniform", "hdf5");
+  //conduit::relay::io::save(data,"uniform", "hdf5");
 
   dray::PathLengths pl;
   pl.resolution(100,100);

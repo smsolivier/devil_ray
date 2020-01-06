@@ -8,11 +8,11 @@
 namespace dray
 {
 
-void write_points(Array<Vec<Float,3>> points)
+void write_points(Array<Vec<Float,3>> points, const std::string name)
 {
   const int32 size = points.size();
   std::ofstream file;
-  file.open("points.vtk");
+  file.open(name + ".vtk");
   file<<"# vtk DataFile Version 3.0\n";
   file<<"particles\n";
   file<<"ASCII\n";

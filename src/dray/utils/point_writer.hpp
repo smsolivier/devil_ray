@@ -13,7 +13,7 @@
 namespace dray
 {
 
-void write_points(Array<Vec<Float,3>> points);
+void write_points(Array<Vec<Float,3>> points, const std::string name = "points");
 
 } // namespace dray
 
