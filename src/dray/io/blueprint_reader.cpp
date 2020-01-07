@@ -301,12 +301,10 @@ void uniform_low_order_fields(const conduit::Node &n_dataset, DataSet &dataset)
         if(assoc_str == "vertex")
         {
           assoc = LowOrderField::Assoc::Vertex;
-          std::cout<<"V size "<<values.size()<<"\n";
         }
         else
         {
           assoc = LowOrderField::Assoc::Element;
-          std::cout<<"E size "<<values.size()<<"\n";
         }
 
         std::shared_ptr<LowOrderField> field

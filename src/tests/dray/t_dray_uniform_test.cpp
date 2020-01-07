@@ -13,7 +13,35 @@
 
 #define EXAMPLE_MESH_SIDE_DIM 10
 
-TEST (dray_slice, dray_slice)
+void set_up(conduit::Node &data)
+{
+  const int size = data["fields/radial/values"].dtype().number_of_elements();
+  double *radial = data["fields/radial/values"].value();
+  double minv = 1e30, maxv = -1e30;
+  for(int i = 0; i < size; ++i)
+  {
+    double val = radial[i];
+    minv = std::min(minv, val);
+    maxv = std::max(maxv, val);
+  }
+
+  data["fields/emission"] = data["fields/radial"];
+  data["fields/absorption"] = data["fields/radial"];
+
+  double *emission= data["fields/emission/values"].value();
+  double *absorption= data["fields/absorption/values"].value();
+
+  for(int i = 0; i < size; ++i)
+  {
+    double val = radial[i];
+    val = (val - minv) / (maxv - minv);
+    absorption[i] = val * 0.5f;
+    emission[i] = val;
+  }
+
+}
+
+TEST (dray_bananas, dray_cool_beans)
 {
   std::string output_path = prepare_output_dir ();
   std::string output_file =
@@ -26,14 +54,21 @@ TEST (dray_slice, dray_slice)
                                             EXAMPLE_MESH_SIDE_DIM,
                                             EXAMPLE_MESH_SIDE_DIM,
                                             data);
+  set_up(data);
   //data.print();
   dray::DataSet dataset = dray::BlueprintReader::blueprint_to_dray(data);
   //conduit::relay::io::save(data,"uniform", "hdf5");
 
+  dray::Vec<float,3> detector_center;
+  detector_center[0] = 0.f;
+  detector_center[1] = 0.f;
+  detector_center[2] = -15.f;
+
   dray::PathLengths pl;
   pl.resolution(100,100);
-  pl.absorption_field("radial");
-  pl.emission_field("radial");
+  pl.absorption_field("absorption");
+  pl.emission_field("emission");
+  pl.point(detector_center);
   pl.execute(dataset);
 
 }

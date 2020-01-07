@@ -194,9 +194,9 @@ struct DDATraversal
 PathLengths::PathLengths()
  :  m_x_res(512),
     m_y_res(512),
-    m_width(2.f),
-    m_height(2.f),
-    m_origin({{0.f, 0.f, 15.f}}),
+    m_width(20.f),
+    m_height(20.f),
+    m_point({{0.f, 0.f, 15.f}}),
     m_normal({{0.f, 0.f, 1.f}}),
     m_x_dir({{1.f, 0.f, 0.f}})
 {
@@ -212,13 +212,16 @@ PathLengths::generate_pixels()
   assert(dot(m_normal, m_x_dir) == 0.f);
 
   Vec<Float,3> y_dir = cross(m_normal, m_x_dir);
-
+  y_dir.normalize();
   // avoid lambda capturing 'this'
   Vec<Float,3> x_dir = m_x_dir;
+  x_dir.normalize();
   const int32 width = m_x_res;
 
   Vec<Float,3> start;
-  start = m_origin;
+  // we need the bottom left of the quad which is centered
+  // at 'm_point'
+  start = m_point - x_dir * m_width * 0.5f - y_dir * m_height * 0.5f;
   start += (pixel_width / 2.f) * x_dir;
   start += (pixel_height / 2.f) * y_dir;
 
@@ -256,24 +259,17 @@ go(Array<Vec<Float,3>> &pixels,
   const int32 size = pixels.size();
   const Float *absorption_ptr = absorption->values().get_device_ptr_const();
   const Float *emission_ptr = emission->values().get_device_ptr_const();
-  std::cout<<"Size abs "<<absorption->values().size();
 
   // output
   Array<Float> path_lengths;
   path_lengths.resize(size);
   Float *length_ptr = path_lengths.get_device_ptr();
 
-  Array<Vec<Float,3>> path;
-  path.resize(20);
-  Vec<Float,3> *path_ptr = path.get_device_ptr();
-
   RAJA::forall<for_policy>(RAJA::RangeSegment(0, size), [=] DRAY_LAMBDA (int32 index)
   {
     Vec<Float,3> pixel = pixel_ptr[index];
     Float sum = 0;
-    //for(int sample = 0; sample < size_samples; ++sample)
-    int32 path_count;
-    for(int sample = 0; sample < 1; ++sample)
+    for(int sample = 0; sample < size_samples; ++sample)
     {
       Vec<Float,3> loc = sample_ptr[sample];
       Vec<Float,3> dir = pixel - loc;
@@ -298,29 +294,17 @@ go(Array<Vec<Float,3>> &pixels,
 
         distance = voxel_exit;
         state.advance();
-        if(index == 40)
-        {
-          std::cout<<state.m_voxel<<" length "<<length<<" res "<<res<<" abs "<<absorb<<" emis "<<emis<<"\n";
-          std::cout<<absorption_ptr[cell_id]<<" "<<emission_ptr[cell_id]<<"\n";
-          path_ptr[path_count] = loc + dir * distance;
-          path_count++;
-        }
+        //if(index == 40)
+        //{
+        //  std::cout<<state.m_voxel<<" length "<<length<<" res "<<res<<" abs "<<absorb<<" emis "<<emis<<"\n";
+        //  std::cout<<absorption_ptr[cell_id]<<" "<<emission_ptr[cell_id]<<"\n";
+        //}
 
       }
       sum += res;
-
-      if(index == 40)
-      {
-        for(int p = path_count; p < 20; ++p)
-        {
-          path_ptr[path_count] = {{0.f, 0.f,0.f}};
-        }
-      }
-
     }
     length_ptr[index] = sum;
   });
-  write_points(path, "path");
   return path_lengths;
 }
 
@@ -357,8 +341,6 @@ void PathLengths::execute(DataSet &data_set)
     UniformTopology *uni_topo = dynamic_cast<UniformTopology*>(topo);
     LowOrderField *absorption = dynamic_cast<LowOrderField*>(data_set.field(m_absorption_field));
     LowOrderField *emission = dynamic_cast<LowOrderField*>(data_set.field(m_emission_field));
-
-    std::cout<<"emision "<<emission<<"\n";
 
     if(absorption->assoc() != LowOrderField::Assoc::Element)
     {
@@ -438,6 +420,19 @@ void PathLengths::resolution(const int32 x, const int32 y)
 {
   m_x_res = x;
   m_y_res = y;
+}
+
+void PathLengths::size(const float32 width, const float32 height)
+{
+  m_width = width;
+  m_height = height;
+}
+
+void PathLengths::point(Vec<float32,3> p)
+{
+  m_point[0] = p[0];
+  m_point[1] = p[1];
+  m_point[2] = p[2];
 }
 
 };//namespace dray
