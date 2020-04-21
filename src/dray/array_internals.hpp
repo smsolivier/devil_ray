@@ -306,8 +306,21 @@ template <typename T> class ArrayInternals : public ArrayInternalsBase
     if (m_host != nullptr)
     {
       auto &rm = umpire::ResourceManager::getInstance ();
-      umpire::Allocator host_allocator = rm.getAllocator ("HOST");
-      host_allocator.deallocate (m_host);
+      auto host_allocator = rm.getAllocator ("HOST");
+      const std::string alloc_name = "HOST_POOLED";
+
+      umpire::Allocator pooled_allocator;
+      if(!rm.isAllocator(alloc_name))
+      {
+        pooled_allocator =
+          rm.makeAllocator<umpire::strategy::DynamicPool>(alloc_name,
+                                                          host_allocator);
+      }
+      else
+      {
+        pooled_allocator = rm.getAllocator (alloc_name);
+      }
+      pooled_allocator.deallocate (m_host);
       m_host = nullptr;
       m_host_dirty = true;
     }
@@ -319,8 +332,21 @@ template <typename T> class ArrayInternals : public ArrayInternalsBase
     if (m_host == nullptr)
     {
       auto &rm = umpire::ResourceManager::getInstance ();
-      umpire::Allocator host_allocator = rm.getAllocator ("HOST");
-      m_host = static_cast<T *> (host_allocator.allocate (m_size * sizeof (T)));
+      auto host_allocator = rm.getAllocator ("HOST");
+      const std::string alloc_name = "HOST_POOLED";
+
+      umpire::Allocator pooled_allocator;
+      if(!rm.isAllocator(alloc_name))
+      {
+        pooled_allocator =
+          rm.makeAllocator<umpire::strategy::DynamicPool>(alloc_name,
+                                                          host_allocator);
+      }
+      else
+      {
+        pooled_allocator = rm.getAllocator (alloc_name);
+      }
+      m_host = static_cast<T *> (pooled_allocator.allocate (m_size * sizeof (T)));
     }
   }
 
