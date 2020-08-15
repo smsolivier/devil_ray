@@ -41,6 +41,7 @@ set(dray_headers dray.hpp
                  triangle_mesh.hpp
                  triangle_intersection.hpp
                  vec.hpp
+
                  io/obj_reader.hpp
                  io/mfem_reader.hpp
                  io/blueprint_reader.hpp
@@ -261,16 +262,16 @@ if(ENABLE_CUDA)
   if(DEBUG_CPU_ONLY)
     set(CMAKE_CUDA_FLAGS "${CMAKE_CUDA_FLAGS} -DDEBUG_CPU_ONLY")
   endif()
-  
+
   # Building the BVH requires us to propagate bounding boxes in a tree
   # from the bottom up. This means one thread can update aabbs in a node
-  # before terminating and letting another thread take over processing 
+  # before terminating and letting another thread take over processing
   # of the sub-tree. That said, there are no promises about which thread,
-  # and apparently there is no cache coherence between L1 caches so the 
+  # and apparently there is no cache coherence between L1 caches so the
   # other thread can might not get the updated data, destroying entire
   # subtrees of the bvh. This doesn't happen vary often, but does happen.
-  # This compile flags disables L1 cache for this source file, preventing 
-  # the issue. This line is the culmination of 10 hours of debugging, 
+  # This compile flags disables L1 cache for this source file, preventing
+  # the issue. This line is the culmination of 10 hours of debugging,
   # during which I questioned my own reality (ML). Slight optimization
   # would be to move the one function to another file.
   set_source_files_properties(linear_bvh_builder.cpp PROPERTIES COMPILE_FLAGS "-Xptxas -dlcm=cg")
@@ -328,10 +329,23 @@ if(MPI_FOUND)
   ########################################
   set(dray_mpi_deps mpi ${dray_thirdparty_libs} conduit_relay_mpi)
 
+  set(dray_mpi_headers ${dray_headers}
+                       communication/messenger.hpp
+                       communication/ray_messenger.hpp
+                       communication/memstream.hpp
+                       communication/comm_data.hpp
+                       )
+
+  set(dray_mpi_sources ${dray_sources}
+                       communication/messenger.cpp
+                       communication/ray_messenger.cpp
+                       communication/memstream.cpp
+                       )
+
   blt_add_library(
     NAME dray_mpi
-    SOURCES ${dray_sources}
-    HEADERS ${dray_headers}
+    SOURCES ${dray_mpi_sources}
+    HEADERS ${dray_mpi_headers}
     DEPENDS_ON ${dray_mpi_deps} apcomp_mpi
     )
 
