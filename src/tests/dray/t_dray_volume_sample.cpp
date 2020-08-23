@@ -11,13 +11,18 @@
 #include <dray/rendering/volume_sampler.hpp>
 #include <dray/utils/appstats.hpp>
 
-TEST (dray_slice, dray_slice)
+TEST (dray_sampler, volume_sampler)
 {
-
-  std::string root_file = std::string (DATA_DIR) + "impeller_p2_000000.root";
+  std::string root_file = std::string (DATA_DIR) + "laghos_tg.cycle_000350.root";
   std::string output_path = prepare_output_dir ();
   std::string output_file =
-  conduit::utils::join_file_path (output_path, "impeller_faces");
+  conduit::utils::join_file_path (output_path, "tg_sampling");
+
+//  std::string root_file = std::string (DATA_DIR) + "impeller_p2_000000.root";
+//  std::string output_path = prepare_output_dir ();
+//  std::string output_file =
+//  conduit::utils::join_file_path (output_path, "impeller_faces");
+
   remove_test_image (output_file);
 
   dray::Collection dataset = dray::BlueprintReader::load (root_file);
