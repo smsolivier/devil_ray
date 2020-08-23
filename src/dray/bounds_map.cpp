@@ -3,12 +3,157 @@
 #include <dray/dray.hpp>
 #include <dray/linear_bvh_builder.hpp>
 
+
 #ifdef DRAY_MPI_ENABLED
 #include <mpi.h>
 #endif
 
 namespace dray
 {
+
+namespace detail
+{
+
+bool intersect_AABB_dist_host(const Vec<float32,4> *bvh,
+                              const int32 &currentNode,
+                              const Vec<Float,3> &orig_dir,
+                              const Vec<Float,3> &inv_dir,
+                              const Float& closest_dist,
+                              bool &hit_left,
+                              bool &hit_right,
+                              Float &ldist,
+                              Float &rdist,
+                              const Float &min_dist) //Find hit after this distance
+{
+  Vec<float32, 4> first4  = bvh[currentNode + 0];
+  Vec<float32, 4> second4 = bvh[currentNode + 1];
+  Vec<float32, 4> third4  = bvh[currentNode + 2];
+  Float xmin0 = first4[0] * inv_dir[0] - orig_dir[0];
+  Float ymin0 = first4[1] * inv_dir[1] - orig_dir[1];
+  Float zmin0 = first4[2] * inv_dir[2] - orig_dir[2];
+  Float xmax0 = first4[3] * inv_dir[0] - orig_dir[0];
+  Float ymax0 = second4[0] * inv_dir[1] - orig_dir[1];
+  Float zmax0 = second4[1] * inv_dir[2] - orig_dir[2];
+  Float min0 = fmaxf(
+    fmaxf(fmaxf(fminf(ymin0, ymax0), fminf(xmin0, xmax0)), fminf(zmin0, zmax0)),
+    min_dist);
+  Float max0 = fminf(
+    fminf(fminf(fmaxf(ymin0, ymax0), fmaxf(xmin0, xmax0)), fmaxf(zmin0, zmax0)),
+    closest_dist);
+  hit_left = (max0 >= min0);
+
+  Float xmin1 = second4[2] * inv_dir[0] - orig_dir[0];
+  Float ymin1 = second4[3] * inv_dir[1] - orig_dir[1];
+  Float zmin1 = third4[0] * inv_dir[2] - orig_dir[2];
+  Float xmax1 = third4[1] * inv_dir[0] - orig_dir[0];
+  Float ymax1 = third4[2] * inv_dir[1] - orig_dir[1];
+  Float zmax1 = third4[3] * inv_dir[2] - orig_dir[2];
+
+  Float min1 = fmaxf(
+    fmaxf(fmaxf(fminf(ymin1, ymax1), fminf(xmin1, xmax1)), fminf(zmin1, zmax1)),
+    min_dist);
+  Float max1 = fminf(
+    fminf(fminf(fmaxf(ymin1, ymax1), fmaxf(xmin1, xmax1)), fmaxf(zmin1, zmax1)),
+    closest_dist);
+  hit_right = (max1 >= min1);
+
+  ldist = min0;
+  rdist = min1;
+
+  return (min0 > min1);
+}
+
+void intersect_ray_host(Ray &ray, BVH &bvh, std::vector<int32> &hits)
+{
+
+  const int32 *leaf_ptr = bvh.m_leaf_nodes.get_host_ptr_const();
+  const int32 *aabb_ids_ptr = bvh.m_aabb_ids.get_host_ptr_const();
+  const Vec<float32, 4> *inner_ptr = bvh.m_inner_nodes.get_host_ptr_const();
+
+  Float closest_dist = ray.m_far;
+  Float min_dist = ray.m_near;
+  const Vec<Float,3> dir = ray.m_dir;
+  Vec<Float,3> inv_dir;
+  inv_dir[0] = rcp_safe(dir[0]);
+  inv_dir[1] = rcp_safe(dir[1]);
+  inv_dir[2] = rcp_safe(dir[2]);
+
+  int32 current_node;
+  int32 todo[64];
+  int32 stackptr = 0;
+  current_node = 0;
+
+  constexpr int32 barrier = -2000000000;
+  todo[stackptr] = barrier;
+
+  const Vec<Float,3> orig = ray.m_orig;
+
+  Vec<Float,3> orig_dir;
+  orig_dir[0] = orig[0] * inv_dir[0];
+  orig_dir[1] = orig[1] * inv_dir[1];
+  orig_dir[2] = orig[2] * inv_dir[2];
+
+  while (current_node != barrier)
+  {
+    if (current_node > -1)
+    {
+      Float ldist, rdist;
+      bool hit_left, hit_right;
+      bool right_closer = intersect_AABB_dist_host(inner_ptr,
+                                                   current_node,
+                                                   orig_dir,
+                                                   inv_dir,
+                                                   closest_dist,
+                                                   hit_left,
+                                                   hit_right,
+                                                   ldist,
+                                                   rdist,
+                                                   min_dist);
+      if (!hit_left && !hit_right)
+      {
+        current_node = todo[stackptr];
+        stackptr--;
+      }
+      else
+      {
+        Vec<float32, 4> children = inner_ptr[current_node + 3];
+        int32 l_child;
+        constexpr int32 isize = sizeof(int32);
+        memcpy(&l_child, &children[0], isize);
+        int32 r_child;
+        memcpy(&r_child, &children[1], isize);
+        current_node = (hit_left) ? l_child : r_child;
+
+        if (hit_left && hit_right)
+        {
+          if (right_closer)
+          {
+            current_node = r_child;
+            stackptr++;
+            todo[stackptr] = l_child;
+          }
+          else
+          {
+            stackptr++;
+            todo[stackptr] = r_child;
+          }
+        }
+      }
+    } // if inner node
+
+    if (current_node < 0 && current_node != barrier)
+    {
+      //if(current_distance > closest_dist) std::cout<<"B";
+      current_node = -current_node - 1; //swap the neg address
+      hits.push_back(current_node);
+
+      current_node = todo[stackptr];
+      stackptr--;
+    } // if leaf node
+  } //while
+}
+
+} // namespace detail
 
 void BoundsMap::clear()
 {
@@ -41,10 +186,16 @@ int BoundsMap::get_rank(const int32 &block_id)
   return rank;
 }
 
+void BoundsMap::find(Ray &ray, std::vector<int32> &domain_ids)
+{
+  domain_ids.clear();
+  detail::intersect_ray_host(ray, m_bvh, domain_ids);
+}
+
 void BoundsMap::build()
 {
   int size = m_bounds.size();
-#if DRAY_MPI_ENABLEDV
+#if DRAY_MPI_ENABLED
   int rank;
   int procs;
 
@@ -164,6 +315,7 @@ void BoundsMap::build()
   delete[] box_counts;
   delete[] rank_map;
 #endif
+
   Array<AABB<3>> aabbs;
   aabbs.resize(m_bounds.size());
 
@@ -173,12 +325,12 @@ void BoundsMap::build()
   AABB<3> *aabbs_ptr = aabbs.get_host_ptr();
   int32 *dom_ids_ptr = domain_ids.get_host_ptr();
 
-  int idx = 0;
+  int itr = 0;
   for(auto bounds : m_bounds)
   {
-    dom_ids_ptr[idx] = bounds.first;
-    aabbs_ptr[idx] = bounds.second;
-    idx++;
+    dom_ids_ptr[itr] = bounds.first;
+    aabbs_ptr[itr] = bounds.second;
+    itr++;
   }
 
   LinearBVHBuilder builder;

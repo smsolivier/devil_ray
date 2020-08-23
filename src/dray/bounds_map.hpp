@@ -2,8 +2,10 @@
 #define DRAY_BOUNDS_MAP_HPP
 
 #include <dray/aabb.hpp>
+#include <dray/ray.hpp>
 #include <dray/bvh.hpp>
 #include <map>
+#include <vector>
 
 namespace dray
 {
@@ -14,6 +16,8 @@ public:
   void clear();
 
   void add_block(int32 id, const AABB<3> &bounds);
+
+  void find(Ray &ray, std::vector<int32> &domain_ids);
 
   // returns -1 if not found
   int get_rank(const int32 &block_id);
