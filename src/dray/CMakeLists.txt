@@ -67,6 +67,7 @@ set(dray_headers dray.hpp
                  rendering/text_annotator.hpp
                  rendering/volume.hpp
                  rendering/volume_partial.hpp
+                 rendering/volume_sampler.hpp
                  rendering/volume_shader.hpp
 
                  utils/color_buffer_utils.hpp
@@ -170,6 +171,7 @@ set(dray_sources dray.cpp
                  rendering/surface.cpp
                  rendering/text_annotator.cpp
                  rendering/volume.cpp
+                 rendering/volume_sampler.cpp
                  rendering/volume_partial.cpp
 
                  utils/appstats.cpp

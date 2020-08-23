@@ -356,5 +356,21 @@ MeshBoundary::execute(Collection &collection)
   return res;
 }
 
+DataSet
+MeshBoundary::execute(DataSet &data_set)
+{
+  if(data_set.topology()->dims() == 3)
+  {
+    detail::BoundaryFunctor func(data_set);
+    dispatch_3d(data_set.topology(), func);
+    return func.m_output;
+  }
+  else
+  {
+    // just pass it through
+    return data_set;
+  }
+}
+
 
 }//namespace dray

@@ -20,6 +20,7 @@ public:
    * Assume that ElemT::get_dim()==3, so we will return NDElem with dim 2.
    */
   Collection execute(Collection &collection);
+  DataSet execute(DataSet &data_set);
 };
 
 };//namespace dray
