@@ -3,8 +3,8 @@
 //
 // SPDX-License-Identifier: (BSD-3-Clause)
 
-#ifndef DRAY_VOLUME_SAMPLER_HPP
-#define DRAY_VOLUME_SAMPLER_HPP
+#ifndef DRAY_DOMAIN_SAMPLER_HPP
+#define DRAY_DOMAIN_SAMPLER_HPP
 
 #include <dray/collection.hpp>
 #include <dray/color_map.hpp>
@@ -16,7 +16,7 @@
 namespace dray
 {
 
-class VolumeSampler
+class DomainSampler
 {
 protected:
   ColorMap m_color_map;
@@ -26,9 +26,9 @@ protected:
   Range m_field_range;
 
 public:
-  VolumeSampler() = delete;
-  VolumeSampler(DataSet &data_set);
-  ~VolumeSampler();
+  DomainSampler();
+  DomainSampler(const DataSet &data_set);
+  ~DomainSampler();
 
   //Array<VolumePartial> integrate(Array<Ray> &rays, Array<PointLight> &lights);
   void sample(Array<Ray> &rays);
@@ -37,6 +37,7 @@ public:
   void input(DataSet &data_set);
 
   void field(const std::string field);
+  void range(const Range &range);
   std::string field() const;
 
 protected:

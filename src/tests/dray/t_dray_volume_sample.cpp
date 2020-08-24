@@ -8,7 +8,7 @@
 #include "gtest/gtest.h"
 #include <dray/io/blueprint_reader.hpp>
 #include <dray/rendering/camera.hpp>
-#include <dray/rendering/volume_sampler.hpp>
+#include <dray/rendering/domain_sampler.hpp>
 #include <dray/utils/appstats.hpp>
 
 TEST (dray_sampler, volume_sampler)
@@ -41,7 +41,7 @@ TEST (dray_sampler, volume_sampler)
   camera.create_rays(rays);
 
   dray::DataSet domain = dataset.domain(0);
-  dray::VolumeSampler sampler(domain);
+  dray::DomainSampler sampler(domain);
   sampler.sample(rays);
 
 }

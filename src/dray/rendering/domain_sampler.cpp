@@ -2,7 +2,7 @@
 // Devil Ray Developers. See the top-level COPYRIGHT file for details.
 //
 // SPDX-License-Identifier: (BSD-3-Clause)
-#include <dray/rendering/volume_sampler.hpp>
+#include <dray/rendering/domain_sampler.hpp>
 #include <dray/rendering/device_framebuffer.hpp>
 #include <dray/rendering/colors.hpp>
 #include <dray/rendering/surface.hpp>
@@ -180,20 +180,25 @@ Array<Vec<Float,2>> calc_segment(Array<RayHit> &first_hits,
 } // namespace detail
 
 // ------------------------------------------------------------------------
-VolumeSampler::VolumeSampler(DataSet &data_set)
+DomainSampler::DomainSampler(const DataSet &data_set)
   : m_data_set(data_set)
 {
   init();
 }
 
 // ------------------------------------------------------------------------
-VolumeSampler::~VolumeSampler()
+DomainSampler::DomainSampler()
+{
+}
+
+// ------------------------------------------------------------------------
+DomainSampler::~DomainSampler()
 {
 }
 
 // ------------------------------------------------------------------------
 void
-VolumeSampler::input(DataSet &data_set)
+DomainSampler::input(DataSet &data_set)
 {
   m_data_set = data_set;
   init();
@@ -202,31 +207,40 @@ VolumeSampler::input(DataSet &data_set)
 // ------------------------------------------------------------------------
 
 void
-VolumeSampler::field(const std::string field)
+DomainSampler::field(const std::string field)
 {
   m_field = field;
-  std::vector<Range> ranges = m_data_set.field(m_field)->range();
-  if(ranges.size() != 0)
-  {
-    DRAY_ERROR("Volume Sampler field must be a scalar");
-  }
-  m_field_range = ranges[0];
+}
+
+void
+DomainSampler::range(const Range &range)
+{
+  m_field_range = range;
 }
 
 std::string
-VolumeSampler::field() const
+DomainSampler::field() const
 {
   return m_field;
 }
 
-void VolumeSampler::init()
+void DomainSampler::init()
 {
   MeshBoundary boundary;
   m_boundary = boundary.execute(m_data_set);
 }
 
-void VolumeSampler::sample(Array<Ray> &rays)
+void DomainSampler::sample(Array<Ray> &rays)
 {
+  if(m_field_range.is_empty())
+  {
+    std::vector<Range> ranges = m_data_set.field(m_field)->range();
+    if(ranges.size() != 0)
+    {
+      DRAY_ERROR("Volume Sampler field must be a scalar");
+    }
+    m_field_range = ranges[0];
+  }
 
   Collection col;
   col.add_domain(m_data_set);
